@@ -29,6 +29,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    container_name: etl-hubspot-app
     # run container processes as the host user by default (helps avoid permission issues
     # when mounting the source directory). You can set LOCAL_UID and LOCAL_GID in your .env
     # to your host uid/gid (e.g. `id -u` / `id -g`). Defaults to 1000:1000.
