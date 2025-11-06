@@ -1,0 +1,63 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:17.3-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Keep DB_* available inside the container
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-etl_hubspot}
+      # The official postgres image expects POSTGRES_* variables to initialize the DB
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-etl_hubspot}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      # use double-dollar in the healthcheck command so docker-compose does not expand at parsing time
+      test: [ "CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # run container processes as the host user by default (helps avoid permission issues
+    # when mounting the source directory). You can set LOCAL_UID and LOCAL_GID in your .env
+    # to your host uid/gid (e.g. `id -u` / `id -g`). Defaults to 1000:1000.
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    volumes:
+      - ./:/app:cached
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      # Expose DB_* variables (requested names)
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-etl_hubspot}
+      # Also keep DATABASE_* for apps that expect those names (map from DB_*)
+      DATABASE_HOST: ${DB_HOST:-db}
+      DATABASE_PORT: ${DB_PORT:-5432}
+      DATABASE_USER: ${DB_USER:-postgres}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-postgres}
+      DATABASE_NAME: ${DB_NAME:-etl_hubspot}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: [ "pnpm", "run", "start:dev" ]
+
+volumes:
+  db-data:

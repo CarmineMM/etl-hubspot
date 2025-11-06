@@ -1,0 +1,24 @@
+FROM node:22-alpine
+
+# Enable corepack to use pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+# Copy lockfiles first for faster installs
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies (will be reused when mounting a volume)
+RUN pnpm install
+
+# Copy everything (optional since we mount in docker-compose), but keep as fallback
+COPY . .
+
+EXPOSE 3000
+
+# Use a non-root user for safety (optional)
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup || true
+USER appuser
+
+# Default command - in docker-compose we'll run start:dev. Keep as fallback.
+CMD ["pnpm", "run", "start:dev"]
