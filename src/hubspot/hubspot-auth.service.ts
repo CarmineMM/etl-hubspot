@@ -89,16 +89,22 @@ export class HubSpotAuthService {
     async getValidAccessToken(): Promise<string> {
         // Si no hay token o está expirado, lanzar error
         if (!this.accessToken || !this.tokenExpiresAt) {
+            this.logger.warn(
+                'No hay token de acceso o ha expirado. Se requiere autenticación.',
+            )
             throw new Error(
                 'No hay token de acceso. Debe autenticarse primero.',
             )
         }
 
         // Si el token expira en menos de 5 minutos, refrescarlo
-        if (this.tokenExpiresAt - Date.now() < 5 * 60 * 1000) {
+        const fiveMinutesInMs = 5 * 60 * 1000
+        if (this.tokenExpiresAt - Date.now() < fiveMinutesInMs) {
+            this.logger.log('El token está por expirar, refrescando...')
             await this.refreshAccessToken()
         }
 
+        this.logger.log('Devolviendo token de acceso válido')
         return this.accessToken
     }
 

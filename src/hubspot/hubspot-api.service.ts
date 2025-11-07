@@ -73,14 +73,20 @@ export class HubSpotApiService {
     private async fetchContactsPage(
         after?: string,
     ): Promise<HubSpotContactsResponse> {
+        this.logger.log('Obteniendo token de acceso válido...')
         const accessToken = await this.authService.getValidAccessToken()
+        this.logger.log('Token de acceso obtenido correctamente')
 
         const params: Record<string, string> = {
             limit: '100',
+            properties: 'email,firstname,lastname,createdate,lastmodifieddate',
         }
 
         if (after) {
             params.after = after
+            this.logger.log(`Solicitando página de contactos después del ID: ${after}`)
+        } else {
+            this.logger.log('Solicitando primera página de contactos')
         }
 
         const response = await axios.get<HubSpotContactsResponse>(
