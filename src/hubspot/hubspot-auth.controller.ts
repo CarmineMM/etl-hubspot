@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, Logger } from '@nestjs/common'
+import { Controller, Get, Query, Res, Logger, HttpCode } from '@nestjs/common'
 import type { Response } from 'express'
 import { HubSpotAuthService } from './hubspot-auth.service'
 import { ContactsService } from '../crm/contacts/contacts.service'
@@ -10,7 +10,7 @@ export class HubSpotAuthController {
     constructor(
         private readonly authService: HubSpotAuthService,
         private readonly contactsService: ContactsService,
-    ) { }
+    ) {}
 
     /**
      * Endpoint para iniciar el flujo de OAuth
@@ -28,53 +28,73 @@ export class HubSpotAuthController {
      * HubSpot redirige aquí después de que el usuario autoriza
      */
     @Get('callback')
-    async callback(
-        @Query('code') code: string,
-        @Res() res: Response,
-    ): Promise<void> {
+    @HttpCode(200)
+    async callback(@Query('code') code: string): Promise<{
+        success: boolean
+        message: string
+        data?: any
+        statusCode?: number
+        error?: string
+    }> {
+        this.logger.log('Código de autorización recibido, intercambiando...')
+        this.logger.debug(
+            `Código recibido: ${code ? '***' + code.slice(-8) : 'No proporcionado'}`,
+        )
+
         if (!code) {
-            this.logger.error('No se recibió código de autorización')
-            res.status(400).json({
+            const errorMsg = 'No se recibió el código de autorización en la URL'
+            this.logger.error(errorMsg)
+            return {
+                statusCode: 400,
                 success: false,
-                message: 'Código de autorización no recibido',
-            })
-            return
+                message: errorMsg,
+            }
         }
 
         try {
-            this.logger.log(
-                'Código de autorización recibido, intercambiando...',
-            )
+            this.logger.log('Iniciando intercambio de código por token...')
+            const tokenData = await this.authService.exchangeCodeForToken(code)
+            this.logger.log('Token de acceso obtenido exitosamente')
 
-            // Intercambiar código por token
-            await this.authService.exchangeCodeForToken(code)
-
-            // Iniciar proceso ETL automáticamente
+            // Iniciar el proceso ETL
             this.logger.log('Iniciando proceso ETL de contactos...')
             const result = await this.contactsService.syncContactsFromHubSpot()
 
-            res.status(200).json({
+            this.logger.log('Proceso ETL completado exitosamente')
+
+            return {
                 success: true,
-                message: 'Autenticación exitosa y ETL completado',
+                message: 'Autenticación y sincronización completadas',
                 data: {
-                    contactsSynced: result.synced,
-                    contactsUpdated: result.updated,
-                    contactsFailed: result.failed,
-                    totalProcessed: result.total,
+                    ...result,
+                    tokenExpiresAt: tokenData.expires_in
+                        ? new Date(
+                              Date.now() + tokenData.expires_in * 1000,
+                          ).toISOString()
+                        : 'No disponible',
                 },
-            })
-        } catch (error: unknown) {
+            }
+        } catch (error) {
             const errorMessage =
-                error instanceof Error ? error.message : 'Unknown error'
+                error instanceof Error ? error.message : 'Error desconocido'
             this.logger.error(
                 'Error en el proceso de autenticación/ETL',
                 errorMessage,
             )
-            res.status(500).json({
+
+            if (error instanceof Error && 'response' in error) {
+                this.logger.error(
+                    'Detalles del error de la API:',
+                    JSON.stringify((error as any).response?.data, null, 2),
+                )
+            }
+
+            return {
+                statusCode: 500,
                 success: false,
                 message: 'Error en el proceso de autenticación/ETL',
                 error: errorMessage,
-            })
+            }
         }
     }
 

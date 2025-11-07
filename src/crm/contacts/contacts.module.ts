@@ -12,4 +12,4 @@ import { HubSpotAuthService } from '../../hubspot/hubspot-auth.service'
     providers: [ContactsService, HubSpotApiService, HubSpotAuthService],
     exports: [ContactsService],
 })
-export class ContactsModule { }
+export class ContactsModule {}

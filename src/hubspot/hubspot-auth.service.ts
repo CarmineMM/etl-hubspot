@@ -15,7 +15,7 @@ export class HubSpotAuthService {
     private refreshToken: string | null = null
     private tokenExpiresAt: number | null = null
 
-    constructor(private readonly configService: ConfigService) { }
+    constructor(private readonly configService: ConfigService) {}
 
     /**
      * Genera la URL de autorización de HubSpot
@@ -33,7 +33,6 @@ export class HubSpotAuthService {
         authUrl.searchParams.append('scope', scopes)
         console.log(authUrl.toString())
 
-
         return authUrl.toString()
     }
 
@@ -47,6 +46,19 @@ export class HubSpotAuthService {
             this.configService.get<string>('HUBSPOT_CLIENT_SECRET') ?? ''
         const redirectUri =
             this.configService.get<string>('HUBSPOT_REDIRECT_URI') ?? ''
+
+        this.logger.log('Iniciando intercambio de código por token')
+        this.logger.debug(
+            `Client ID: ${clientId ? '***' + clientId.slice(-4) : 'No configurado'}`,
+        )
+        this.logger.debug(`Redirect URI: ${redirectUri}`)
+
+        if (!clientId || !clientSecret || !redirectUri) {
+            this.logger.error(
+                'Faltan credenciales de HubSpot en la configuración',
+            )
+            throw new Error('Configuración de HubSpot incompleta')
+        }
 
         try {
             const response = await axios.post<HubSpotTokenResponse>(
@@ -71,6 +83,12 @@ export class HubSpotAuthService {
             this.tokenExpiresAt = Date.now() + response.data.expires_in * 1000
 
             this.logger.log('Token de acceso obtenido exitosamente')
+            this.logger.debug(
+                `Token expira en: ${new Date(this.tokenExpiresAt).toISOString()}`,
+            )
+            this.logger.debug(
+                `Refresh token: ${this.refreshToken ? '***' + this.refreshToken.slice(-8) : 'No disponible'}`,
+            )
             return response.data
         } catch (error: unknown) {
             const errorMessage =

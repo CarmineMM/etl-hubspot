@@ -22,7 +22,7 @@ export class ContactsService {
         @InjectRepository(Contact)
         private readonly contactRepository: Repository<Contact>,
         private readonly hubspotApiService: HubSpotApiService,
-    ) { }
+    ) {}
 
     /**
      * Sincroniza contactos desde HubSpot a la base de datos

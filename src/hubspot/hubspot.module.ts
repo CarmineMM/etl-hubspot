@@ -10,4 +10,4 @@ import { ContactsModule } from '../crm/contacts/contacts.module'
     providers: [HubSpotAuthService, HubSpotApiService],
     exports: [HubSpotAuthService, HubSpotApiService],
 })
-export class HubSpotModule { }
+export class HubSpotModule {}

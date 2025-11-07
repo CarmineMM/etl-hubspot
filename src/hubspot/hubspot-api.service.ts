@@ -84,7 +84,9 @@ export class HubSpotApiService {
 
         if (after) {
             params.after = after
-            this.logger.log(`Solicitando página de contactos después del ID: ${after}`)
+            this.logger.log(
+                `Solicitando página de contactos después del ID: ${after}`,
+            )
         } else {
             this.logger.log('Solicitando primera página de contactos')
         }
