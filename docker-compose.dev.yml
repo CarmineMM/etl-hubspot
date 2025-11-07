@@ -17,7 +17,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     healthcheck:
       # use double-dollar in the healthcheck command so docker-compose does not expand at parsing time
       test: [ "CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}" ]
@@ -30,9 +30,6 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     container_name: etl-hubspot-app
-    # run container processes as the host user by default (helps avoid permission issues
-    # when mounting the source directory). You can set LOCAL_UID and LOCAL_GID in your .env
-    # to your host uid/gid (e.g. `id -u` / `id -g`). Defaults to 1000:1000.
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     volumes:
       - ./:/app:cached

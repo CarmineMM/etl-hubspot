@@ -11,7 +11,7 @@ Quick start - Development (the compose file will build the app container, instal
 
 ```bash
 # from the repository root
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml up --build -d
 ```
 
 The app will be reachable at http://localhost:3000 and Postgres at port 5432. Environment variables for DB are set in the compose file (user: `postgres`, password: `postgres`, db: `etlhubspot`).
@@ -29,5 +29,3 @@ docker run -p 3000:3000 --env NODE_ENV=production etl-hubspot:prod
 Notes:
 - Development image installs deps and relies on a bind-mount to hot-reload the source and run `pnpm run start:dev`.
 - Production Dockerfile is multi-stage: it builds the app and then installs only production dependencies in the runtime image.
-
-
