@@ -55,6 +55,7 @@ export class HubSpotAuthController {
             this.logger.log('Iniciando intercambio de código por token...')
             const tokenData = await this.authService.exchangeCodeForToken(code)
             this.logger.log('Token de acceso obtenido exitosamente')
+            console.log({ tokenData })
 
             // Iniciar el proceso ETL
             this.logger.log('Iniciando proceso ETL de contactos...')
@@ -102,8 +103,8 @@ export class HubSpotAuthController {
      * Endpoint para verificar el estado de autenticación
      */
     @Get('status')
-    getStatus() {
-        const hasToken = this.authService.hasValidToken()
+    async getStatus() {
+        const hasToken = await this.authService.hasValidToken()
         return {
             authenticated: hasToken,
             message: hasToken
@@ -118,7 +119,7 @@ export class HubSpotAuthController {
     @Get('sync')
     async manualSync() {
         try {
-            if (!this.authService.hasValidToken()) {
+            if (!(await this.authService.hasValidToken())) {
                 return {
                     success: false,
                     message:

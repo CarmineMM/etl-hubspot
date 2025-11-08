@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { TypeOrmModule } from '@nestjs/typeorm'
+import { CacheModule } from '@nestjs/cache-manager'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { ContactsModule } from './crm/contacts/contacts.module'
@@ -12,6 +13,10 @@ import { getDatabaseConfig } from './config/database.config'
         ConfigModule.forRoot({
             isGlobal: true,
             envFilePath: '.env',
+        }),
+        CacheModule.register({
+            isGlobal: true,
+            ttl: 0, // No expiration for tokens (we'll handle expiration manually)
         }),
         TypeOrmModule.forRootAsync({
             imports: [ConfigModule],

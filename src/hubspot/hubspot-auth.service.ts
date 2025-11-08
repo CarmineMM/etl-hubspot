@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, Inject } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { CACHE_MANAGER } from '@nestjs/cache-manager'
+import type { Cache } from 'cache-manager'
 import axios from 'axios'
 
 export interface HubSpotTokenResponse {
@@ -8,17 +10,37 @@ export interface HubSpotTokenResponse {
     expires_in: number
 }
 
+interface CachedTokenData {
+    accessToken: string
+    refreshToken: string
+    expiresAt: number
+}
+
+/**
+ * HubSpot Authentication Service
+ *
+ * Manages OAuth 2.0 authentication flow and token lifecycle for HubSpot API.
+ * Uses NestJS cache manager for persistent token storage across application instances.
+ *
+ * Features:
+ * - OAuth 2.0 authorization flow
+ * - Automatic token refresh before expiration
+ * - Cache-based token persistence
+ * - Token validation and lifecycle management
+ */
 @Injectable()
 export class HubSpotAuthService {
     private readonly logger = new Logger(HubSpotAuthService.name)
-    private accessToken: string | null = null
-    private refreshToken: string | null = null
-    private tokenExpiresAt: number | null = null
+    private readonly CACHE_KEY = 'hubspot_tokens'
 
-    constructor(private readonly configService: ConfigService) {}
+    constructor(
+        private readonly configService: ConfigService,
+        @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    ) {}
 
     /**
-     * Genera la URL de autorización de HubSpot
+     * Generates HubSpot OAuth authorization URL
+     * @returns Authorization URL for user to grant access
      */
     getAuthorizationUrl(): string {
         const clientId =
@@ -37,7 +59,10 @@ export class HubSpotAuthService {
     }
 
     /**
-     * Intercambia el código de autorización por un access token
+     * Exchanges authorization code for access token
+     * Stores tokens in cache for application-wide access
+     * @param code - Authorization code from OAuth callback
+     * @returns Token response with access_token, refresh_token, and expires_in
      */
     async exchangeCodeForToken(code: string): Promise<HubSpotTokenResponse> {
         const clientId =
@@ -78,16 +103,21 @@ export class HubSpotAuthService {
                 },
             )
 
-            this.accessToken = response.data.access_token
-            this.refreshToken = response.data.refresh_token
-            this.tokenExpiresAt = Date.now() + response.data.expires_in * 1000
+            const expiresAt = Date.now() + response.data.expires_in * 1000
+
+            // Store tokens in cache
+            await this.cacheManager.set(this.CACHE_KEY, {
+                accessToken: response.data.access_token,
+                refreshToken: response.data.refresh_token,
+                expiresAt,
+            })
 
             this.logger.log('Token de acceso obtenido exitosamente')
             this.logger.debug(
-                `Token expira en: ${new Date(this.tokenExpiresAt).toISOString()}`,
+                `Token expira en: ${new Date(expiresAt).toISOString()}`,
             )
             this.logger.debug(
-                `Refresh token: ${this.refreshToken ? '***' + this.refreshToken.slice(-8) : 'No disponible'}`,
+                `Refresh token: ${response.data.refresh_token ? '***' + response.data.refresh_token.slice(-8) : 'No disponible'}`,
             )
             return response.data
         } catch (error: unknown) {
@@ -102,13 +132,20 @@ export class HubSpotAuthService {
     }
 
     /**
-     * Obtiene un access token válido (refresca si es necesario)
+     * Retrieves valid access token from cache
+     * Automatically refreshes token if expiring within 5 minutes
+     * @returns Valid access token
+     * @throws Error if no token exists in cache
      */
     async getValidAccessToken(): Promise<string> {
-        // Si no hay token o está expirado, lanzar error
-        if (!this.accessToken || !this.tokenExpiresAt) {
+        const cachedData = await this.cacheManager.get<CachedTokenData>(
+            this.CACHE_KEY,
+        )
+
+        // Si no hay token en cache, lanzar error
+        if (!cachedData) {
             this.logger.warn(
-                'No hay token de acceso o ha expirado. Se requiere autenticación.',
+                'No hay token de acceso en cache. Se requiere autenticación.',
             )
             throw new Error(
                 'No hay token de acceso. Debe autenticarse primero.',
@@ -117,20 +154,30 @@ export class HubSpotAuthService {
 
         // Si el token expira en menos de 5 minutos, refrescarlo
         const fiveMinutesInMs = 5 * 60 * 1000
-        if (this.tokenExpiresAt - Date.now() < fiveMinutesInMs) {
+        if (cachedData.expiresAt - Date.now() < fiveMinutesInMs) {
             this.logger.log('El token está por expirar, refrescando...')
             await this.refreshAccessToken()
+            const refreshedData = await this.cacheManager.get<CachedTokenData>(
+                this.CACHE_KEY,
+            )
+            return refreshedData!.accessToken
         }
 
-        this.logger.log('Devolviendo token de acceso válido')
-        return this.accessToken
+        this.logger.log('Devolviendo token de acceso válido desde cache')
+        return cachedData.accessToken
     }
 
     /**
-     * Refresca el access token usando el refresh token
+     * Refreshes access token using refresh token from cache
+     * Updates cache with new tokens
+     * @throws Error if no refresh token available in cache
      */
     private async refreshAccessToken(): Promise<void> {
-        if (!this.refreshToken) {
+        const cachedData = await this.cacheManager.get<CachedTokenData>(
+            this.CACHE_KEY,
+        )
+
+        if (!cachedData?.refreshToken) {
             throw new Error('No hay refresh token disponible')
         }
 
@@ -148,7 +195,7 @@ export class HubSpotAuthService {
                         grant_type: 'refresh_token',
                         client_id: clientId,
                         client_secret: clientSecret,
-                        refresh_token: this.refreshToken,
+                        refresh_token: cachedData.refreshToken,
                     },
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -156,9 +203,14 @@ export class HubSpotAuthService {
                 },
             )
 
-            this.accessToken = response.data.access_token
-            this.refreshToken = response.data.refresh_token
-            this.tokenExpiresAt = Date.now() + response.data.expires_in * 1000
+            const expiresAt = Date.now() + response.data.expires_in * 1000
+
+            // Update cache with new tokens
+            await this.cacheManager.set(this.CACHE_KEY, {
+                accessToken: response.data.access_token,
+                refreshToken: response.data.refresh_token,
+                expiresAt,
+            })
 
             this.logger.log('Token de acceso refrescado exitosamente')
         } catch (error: unknown) {
@@ -170,13 +222,17 @@ export class HubSpotAuthService {
     }
 
     /**
-     * Verifica si hay un token válido
+     * Checks if valid token exists in cache
+     * @returns True if valid non-expired token exists
      */
-    hasValidToken(): boolean {
+    async hasValidToken(): Promise<boolean> {
+        const cachedData = await this.cacheManager.get<CachedTokenData>(
+            this.CACHE_KEY,
+        )
         return (
-            !!this.accessToken &&
-            !!this.tokenExpiresAt &&
-            this.tokenExpiresAt > Date.now()
+            !!cachedData?.accessToken &&
+            !!cachedData?.expiresAt &&
+            cachedData.expiresAt > Date.now()
         )
     }
 }
