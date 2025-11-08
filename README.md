@@ -1,8 +1,8 @@
-# 🚀 ETL HubSpot - Sistema de Sincronización
+# ETL HubSpot - Sistema de Sincronización
 
 Bienvenido al sistema ETL (Extract, Transform, Load) para HubSpot. Esta aplicación permite sincronizar contactos desde HubSpot CRM a una base de datos PostgreSQL de manera automatizada, utilizando OAuth 2.0 para la autenticación segura.
 
-## 📋 Tabla de Contenidos
+## Tabla de Contenidos
 
 1. [📌 Descripción General](#-descripción-general)
 2. 🚀 [Guía Rápida](#-guía-rápida)
@@ -70,7 +70,7 @@ Detalles técnicos sobre la arquitectura y decisiones de implementación.
 
 Documentación específica sobre la integración con la API de HubSpot.
 
-## 🛠️ Configuración del Entorno
+## Configuración del Entorno
 
 Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
@@ -93,7 +93,7 @@ PORT=3000
 NODE_ENV=development
 ```
 
-## 🔄 Flujo de Autenticación y Sincronización
+## Flujo de Autenticación y Sincronización
 
 1. **Iniciar el flujo de autorización**:
 
@@ -111,7 +111,7 @@ NODE_ENV=development
 
 6. **Los datos se almacenan en PostgreSQL**
 
-## 🐳 Despliegue con Docker
+## Despliegue con Docker
 
 ### Desarrollo
 
@@ -129,7 +129,7 @@ docker build -t etl-hubspot:prod .
 docker run -p 3000:3000 --env-file .env etl-hubspot:prod
 ```
 
-## 🔍 Solución de Problemas
+## Solución de Problemas
 
 ### Error de autenticación
 
@@ -141,19 +141,11 @@ docker run -p 3000:3000 --env-file .env etl-hubspot:prod
 - Verifica que el servicio de PostgreSQL esté en ejecución
 - Comprueba las credenciales de la base de datos en el archivo `.env`
 
-## 📄 Documentación Adicional
+## Documentación Adicional
 
 - [Documentación de la API de HubSpot](https://developers.hubspot.com/docs/api/overview)
 - [Documentación de NestJS](https://docs.nestjs.com/)
 - [Documentación de TypeORM](https://typeorm.io/)
-
-## 🤝 Contribución
-
-1. Haz un fork del proyecto
-2. Crea una rama para tu característica (`git checkout -b feature/AmazingFeature`)
-3. Haz commit de tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Haz push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
 
 ---
 
